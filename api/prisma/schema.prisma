@@ -1,0 +1,184 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(USER)
+  accountNumber String @unique @default(cuid())
+  
+  // KYC Information
+  kycStatus KYCStatus @default(PENDING)
+  kycData   Json?
+  
+  // Profile Information
+  phoneNumber String?
+  address     String?
+  dateOfBirth DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  beneficiaries Beneficiary[]
+  transactions  Transaction[]
+  kycDocuments  KYCDocument[]
+  
+  @@map("users")
+}
+
+model Beneficiary {
+  id            String @id @default(cuid())
+  name          String
+  email         String?
+  bankName      String
+  accountNumber String
+  ifscCode      String
+  country       String @default("IN")
+  currency      String @default("INR")
+  
+  // Additional Information
+  mobileNumber  String?
+  address       String?
+  
+  // Relations
+  userId       String
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("beneficiaries")
+}
+
+model Transaction {
+  id               String            @id @default(cuid())
+  reference        String            @unique
+  amount           Float
+  currency         String            @default("INR")
+  exchangeRate     Float
+  fee              Float
+  status           TransactionStatus @default(PENDING)
+  purpose          String?
+  
+  // Risk Assessment
+  riskLevel        RiskLevel @default(NORMAL)
+  riskFlags        String[]
+  
+  // Relations
+  userId          String
+  user            User @relation(fields: [userId], references: [id])
+  beneficiaryId   String
+  beneficiary     Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("transactions")
+}
+
+model KYCDocument {
+  id           String      @id @default(cuid())
+  type         DocumentType
+  fileName     String
+  filePath     String
+  fileSize     Int
+  mimeType     String
+  status       DocumentStatus @default(PENDING)
+  
+  // Relations
+  userId       String
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("kyc_documents")
+}
+
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  fromCurrency String
+  toCurrency   String
+  rate         Float
+  source       String   @default("API")
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([fromCurrency, toCurrency])
+  @@map("exchange_rates")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@map("audit_logs")
+}
+
+// Enums
+enum Role {
+  USER
+  ADMIN
+}
+
+enum KYCStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum RiskLevel {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum DocumentType {
+  GOVERNMENT_ID
+  PROOF_OF_ADDRESS
+  BANK_STATEMENT
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
